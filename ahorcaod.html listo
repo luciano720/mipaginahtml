@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Juego del Ahorcado</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Arial', sans-serif;
+      background: url('https://www.transparenttextures.com/patterns/connected.png'), linear-gradient(to bottom right, #c6f6f3, #84fab0);
+      background-blend-mode: overlay;
+      color: #333;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .screen {
+      display: none;
+      padding: 2rem;
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      width: 90%;
+      max-width: 600px;
+      text-align: center;
+    }
+    .active {
+      display: block;
+    }
+    button {
+      background-color: #2ec4b6;
+      border: none;
+      padding: 12px 24px;
+      margin: 10px;
+      font-size: 1.2rem;
+      color: white;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #239f91;
+    }
+    #letters button {
+      margin: 5px;
+    }
+    #word-display {
+      font-size: 2rem;
+      margin-top: 10px;
+      letter-spacing: 10px;
+    }
+    canvas {
+      margin-top: 20px;
+      background-color: #ffffff;
+      border: 2px solid #ccc;
+      border-radius: 6px;
+    }
+    h1, h2 {
+      margin-bottom: 1rem;
+      color: #086972;
+    }
+    #hint-image {
+      width: 100px;
+      height: auto;
+      margin: 10px auto 5px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Pantalla 1 -->
+  <div id="screen-start" class="screen active">
+    <h1>🎯 Hangman Game</h1>
+    <button onclick="goToTopicScreen()">Iniciar</button>
+  </div>
+
+  <!-- Pantalla 2 -->
+  <div id="screen-topics" class="screen">
+    <h2>Elige un tema</h2>
+    <button onclick="startGame('descriptions')">Personality descriptions</button>
+    <button onclick="startGame('body')">Human body parts</button>
+  </div>
+
+  <!-- Pantalla 3 -->
+  <div id="screen-game" class="screen">
+    <h2>¡Adivina la palabra!</h2>
+    <img id="hint-image" src="" alt="Pista visual">
+    <div id="word-display">_ _ _</div>
+    <canvas id="canvas" width="300" height="300"></canvas>
+    <div id="letters"></div>
+    <button onclick="goToTopicScreen()">↩ Volver</button>
+  </div>
+
+  <!-- Pantalla 4: Resultado final -->
+  <div id="screen-score" class="screen">
+    <h2>🎯 Puntaje Final</h2>
+    <p id="final-score"></p>
+    <button onclick="goToStartScreen()">🏠 Volver al inicio</button>
+  </div>
+
+  <script>
+    const topics = {
+      descriptions: ["curly", "straight", "chubby", "slim", "blond", "tall", "short", "sneakers", "skirt", "scarf"],
+      body: ["brain", "liver", "kidney", "heart", "stomach", "eyelash", "elbow", "intestine", "arm", "forehead"]
+    };
+
+    const imageHints = {
+      curly: "Imagenes/curly.avif",
+      straight: "Imagenes/Straight.png",
+      chubby: "Imagenes/Chubby.avif",
+      slim: "Imagenes/Slim.png",
+      blond: "Imagenes/Blond.jpg",
+      tall: "Imagenes/Tall.png",
+      short: "Imagenes/short.jpg",
+      sneakers: "Imagenes/Sneakers.jpg",
+      skirt: "Imagenes/Skirt.png",
+      scarf: "Imagenes/Scarf.png",
+      brain: "Imagenes/cerebro.png",
+      liver: "Imagenes/Liver.webp",
+      kidney: "Imagenes/Kidney.avif",
+      heart: "Imagenes/Heart.png",
+      stomach: "Imagenes/Stomach.avif",
+      eyelash: "Imagenes/Eyelash.jpg",
+      elbow: "Imagenes/Elbow.png",
+      intestine: "Imagenes/Intestine.jpg",
+      arm: "Imagenes/Arm.png",
+      forehead: "Imagenes/forehead.jpeg"
+    };
+
+    let currentTopic = "";
+    let wordList = [];
+    let currentWordIndex = 0;
+    let currentWord = "";
+    let guessed = [];
+    let wrongGuesses = 0;
+    let score = 0;
+
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const drawStructure = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(50, 250); ctx.lineTo(200, 250); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(100, 250); ctx.lineTo(100, 50); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(100, 50); ctx.lineTo(180, 50); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(180, 50); ctx.lineTo(180, 80); ctx.stroke();
+    };
+
+    const bodyParts = [
+      () => { ctx.beginPath(); ctx.arc(180, 100, 20, 0, Math.PI * 2); ctx.stroke(); },
+      () => { ctx.beginPath(); ctx.moveTo(180, 120); ctx.lineTo(180, 180); ctx.stroke(); },
+      () => { ctx.beginPath(); ctx.moveTo(180, 140); ctx.lineTo(150, 160); ctx.stroke(); },
+      () => { ctx.beginPath(); ctx.moveTo(180, 140); ctx.lineTo(210, 160); ctx.stroke(); },
+      () => { ctx.beginPath(); ctx.moveTo(180, 180); ctx.lineTo(150, 220); ctx.stroke(); },
+      () => { ctx.beginPath(); ctx.moveTo(180, 180); ctx.lineTo(210, 220); ctx.stroke(); }
+    ];
+
+    function goToTopicScreen() {
+      showScreen("screen-topics");
+    }
+
+    function goToStartScreen() {
+      showScreen("screen-start");
+    }
+
+    function startGame(topic) {
+      currentTopic = topic;
+      wordList = [...topics[topic].slice(0, 5)];
+      currentWordIndex = 0;
+      score = 0;
+      nextWord();
+    }
+
+    function nextWord() {
+      if (currentWordIndex >= wordList.length) {
+        endGame();
+        return;
+      }
+      guessed = [];
+      wrongGuesses = 0;
+      currentWord = wordList[currentWordIndex].toUpperCase();
+      document.getElementById("hint-image").src = imageHints[currentWord.toLowerCase()] || "";
+      generateLetterButtons();
+      updateWordDisplay();
+      drawStructure();
+      showScreen("screen-game");
+    }
+
+    function generateLetterButtons() {
+      const lettersDiv = document.getElementById("letters");
+      lettersDiv.innerHTML = "";
+      for (let i = 65; i <= 90; i++) {
+        const letter = String.fromCharCode(i);
+        const btn = document.createElement("button");
+        btn.textContent = letter;
+        btn.onclick = () => guessLetter(letter);
+        lettersDiv.appendChild(btn);
+      }
+    }
+
+    function guessLetter(letter) {
+      if (guessed.includes(letter)) return;
+      guessed.push(letter);
+      if (currentWord.includes(letter)) {
+        updateWordDisplay();
+      } else {
+        drawBodyPart(wrongGuesses);
+        wrongGuesses++;
+        if (wrongGuesses === bodyParts.length) {
+          setTimeout(() => {
+            alert(`😢 Lo siento, no adivinaste. La palabra era: ${currentWord}`);
+            currentWordIndex++;
+            nextWord();
+          }, 300);
+        }
+      }
+    }
+
+    function drawBodyPart(index) {
+      bodyParts[index]();
+    }
+
+    function updateWordDisplay() {
+      const display = currentWord.split('').map(l => guessed.includes(l) ? l : "_").join(" ");
+      document.getElementById("word-display").textContent = display;
+      if (!display.includes("_")) {
+        score++;
+        setTimeout(() => {
+          alert("🎉 ¡Felicidades! Adivinaste la palabra.");
+          currentWordIndex++;
+          nextWord();
+        }, 300);
+      }
+    }
+
+    function endGame() {
+      document.getElementById("final-score").textContent = `Obtuviste ${score} de ${wordList.length} puntos.`;
+      showScreen("screen-score");
+    }
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+  </script>
+</body>
+</html>
